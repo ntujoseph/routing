@@ -1,0 +1,22 @@
+A-------------B ------------------C
+
+
+My Info: ID=A,MAC Addr=0x7
+S routing table
+dest_id dest_mac  next_id       next_mac
+C       0x3     B       0x2
+
+
+My Info: ID=B,MAC Addr=0x2
+B routing table
+dest_id dest_mac  next_id       next_mac
+A       0x7     A       0x7
+C       0x3     C       0x3
+
+
+
+My Info: ID=C,MAC Addr=0x3
+C routing table
+dest_id dest_mac  next_id       next_mac
+A       0x7     A       0x7
+B       0x2     B       0x2
