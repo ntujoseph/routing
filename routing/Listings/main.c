@@ -100,6 +100,7 @@ void init_table(Route_Table *tbl);
 uint8_t add_route(Route *route,Route_Table *tbl);
 void dump_table(Route_Table *tbl);
 uint16_t find_mac(uint16_t id, Route_Table *tbl);
+Route * find_next_hop(uint16_t id, Route_Table *tbl);
 //----Utility function---------------------
 void pause(uint16_t period);
 void blink_led(int count);
@@ -209,6 +210,10 @@ int main(void)
 						dump_table(&rtable);
 				    //send RREP back to hop by hop 
 				    send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
+				    // we sleep for 5 secoonds to wait KING to wakeup
+				    debug_print(" after sending RREP , go to sleep for 5 seconds\r\n");
+				   // pause(SLEEP_TIME);
+				
 
 					break;				
 			  default: //normal pacekt
@@ -243,7 +248,7 @@ void init()
 	Initial(MY_DEVICE_ADDR,TYPE, RADIO_CHANNEL, PAN_ID);
 	
   host.my_addr=MY_DEVICE_ADDR;
-	host.my_ID='@'; //init to 'A':0x41, @:0x40 
+	host.my_ID='@'; //init to '@':0x40  
 	
 }
 
@@ -340,10 +345,12 @@ void send_FLAG()
 void send_RREP(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl)
 {
 	//query a MAC addr with its ID  
-	 uint16_t  q_addr;
-  q_addr=find_mac(id,tbl);   
- 	if (q_addr)
-	   send_message(RREP,id,q_addr,data,size);
+	// uint16_t  q_addr;
+	 Route *r;
+	
+  r=find_next_hop(id,tbl);   
+ 	if (r)
+	   send_message(RREP,id,r->next_mac ,data,size);
 
 }
 
@@ -448,15 +455,29 @@ uint16_t find_mac(uint16_t id, Route_Table *tbl)
    {
        
        if (id==tbl->table[i].dest_id) 
-          return tbl->table[i].dest_mac;      
-            
- 
-     
+          return tbl->table[i].dest_mac;    
    }
 
    return 0;
 
 }
+
+
+Route * find_next_hop(uint16_t id, Route_Table *tbl)
+{
+   uint8_t i;
+
+   for (i=0;i<tbl->index;i++)
+   {
+       
+       if (id==tbl->table[i].dest_id) 
+          return &tbl->table[i];    
+   }
+
+   return NULL;
+
+}
+
 
 
 void dump_table(Route_Table *tbl)
