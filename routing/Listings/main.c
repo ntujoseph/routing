@@ -1,7 +1,7 @@
 //-----------------------
 // Wireless Communication Homework
 // Author List: joseph(D05921016@ntu.edu.tw), ,  
-// Date: Nov 27,2016
+// Date: Nov 28,2016
 //---------------------
 // Note: 
 // LED Pin  on J3-03
@@ -14,8 +14,9 @@
 #include "autonet.h"
 
 //--------------------
-#define MY_DEVICE_ADDR  0x0003   //!!!!! SHOULD set different mac addr  !!!!!!!!
-#define KING_ID 'C'   //Target ID 'H' 
+#define MY_DEVICE_ADDR  0x0002  //!!!!! SHOULD set different mac addr  !!!!!!!!
+#define NUM_CHILDREN  2        //!!!! SHOULD set correctly !!!!!
+#define KING_ID 'A'+NUM_CHILDREN   //'A'~'H' ; note : Target ID is 'C' if the number of children is 2
 #define DEBUG 1
 //------------------------------
 
@@ -32,6 +33,7 @@
 #define RREP 			  0x4000
 #define FLAG   			0x2000
 #define NORMAL   		0x1000
+#define NORMAL_ACK  0x1001
 
 
 #define SLEEP_TIME 5000  //unit: ms
@@ -54,8 +56,8 @@ typedef struct _packet
   uint16_t dest_mac;
 	uint16_t src_id;
   uint16_t src_mac;
-	uint8_t length;
-	uint8_t data[5];
+	uint8_t length; // data length
+	uint8_t data[10];
 }Packet;
 
 	  
@@ -76,7 +78,23 @@ typedef struct _rtable {
 
 }Route_Table;
 
+uint16_t ID_LIST[10];
+
+typedef struct {
+	
+  uint16_t start_time;
+  uint16_t end_time;	
+	uint16_t packet_count;
+	uint8_t  enable;
+	uint8_t  num_dev;
+}Statistic;
+
+
+enum {INIT=0,GET_ID,SEND_DATA,WAIT_ACK,FINISH};
+Statistic statistic;
+uint8_t State;
 Host host;
+uint8_t finish=0;
 #define PRINT_BUFSIZE 128
 char output_array[PRINT_BUFSIZE]={0}; 	
 
@@ -84,13 +102,16 @@ char output_array[PRINT_BUFSIZE]={0};
 //-------------------
 void debug_print(char *s);
 void show_myinfo(void);
-void show_report(uint16_t id);
+void show_report(void);
 void dump_packet(Packet *p);
 void req_whoami(void);
 void reply_whoami(uint16_t dest_id,uint16_t macaddr);
 void send_message( uint16_t type,uint16_t dest_id,uint16_t dest_mac, uint8_t *data, uint8_t size);
 void send_RREP(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl);
+void send_DATA(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl);
+void send_DATA_ACK(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl);
 void send_FLAG(void);
+void send_to_KING(Route_Table *tbl);
 void init(void);
 
 void update_table(Packet *pkt,Route_Table *tbl);
@@ -102,7 +123,6 @@ void dump_table(Route_Table *tbl);
 uint16_t find_mac(uint16_t id, Route_Table *tbl);
 Route * find_next_hop(uint16_t id, Route_Table *tbl);
 //----Utility function---------------------
-void pause(uint16_t period);
 void blink_led(int count);
 
 int main(void)
@@ -122,7 +142,7 @@ int main(void)
 	Route_Table rtable;
 	uint8_t blink_count=0;
 	uint16_t prev_ID;
- 
+  uint8_t flag=0;
   
   //Packet packet={0x1,'A',0x10,'B',0x11,0,{0}};
 
@@ -130,7 +150,7 @@ int main(void)
   prev_ID=host.my_ID;
   init_table(&rtable);
 	
-  debug_print("Starging .....\r\n");
+   debug_print("Starging .....\r\n");
 	 show_myinfo();
 
 
@@ -148,6 +168,8 @@ int main(void)
           timer_count++;
 		  } 
 		
+
+			
 	
 		if(RF_Rx(rcvd_msg, &rcvd_length, &rcvd_rssi)){
 			
@@ -155,9 +177,13 @@ int main(void)
 			getPayload(rcvd_payload, rcvd_msg, rcvd_payloadLength);
 					
 		 pkt=(Packet *)rcvd_payload;
-      dump_packet(pkt);
 			
-			//packet handleing
+     if (debug) dump_packet(pkt);
+			
+			if (statistic.enable)
+				   statistic.packet_count++;
+			
+			//packet handling
 			switch (pkt->type) {
 			
 				case WHOAMI_REQ:
@@ -177,21 +203,24 @@ int main(void)
 					 show_myinfo();
 				   update_table(pkt,&rtable);
 				 
-					if (host.my_ID==KING_ID) {
-					    //send RREP back
-						uint16_t pre_id=host.my_ID-1;
-			      uint8_t data[5];
-					  memcpy(data,&host,sizeof(Host));
-		        send_RREP(pre_id,data,sizeof(Host),&rtable);						
-					
-						//broadcast 'FLAG'  
-					  debug_print("broadcast 'FLAG' ....\r\n");
-						send_FLAG();
+					if (host.my_ID==KING_ID && flag==0) {
 						
-						 // sleep for 5 seconds
-				
-						pause(SLEEP_TIME);
-						debug_print("wake up!!\r\n");
+						uint8_t data[10];
+						
+						//broadcast 'FLAG'  
+					  debug_print("broadcast 'FLAG' and go to sleep zzzzzzz\r\n");
+						send_FLAG();						
+					  // sleep for 5 seconds
+						Delay(SLEEP_TIME);
+						debug_print("I just waking up!! and send send_RREP\r\n");
+						statistic.start_time=timer_count;
+					  //send RREP back to notify others that I just waking up
+						memcpy(data,&host,sizeof(Host));
+		        send_RREP(host.my_ID-1,data,sizeof(Host),&rtable);						
+			      statistic.enable=1;
+					  flag=1;
+						
+						
 						
 					}
 
@@ -200,9 +229,9 @@ int main(void)
 				
 				case RREP:
 				 //update routing table 	
-          debug_print("Get RREP....\r\n");
+            debug_print("Get RREP....\r\n");
 						memcpy(&host_info,pkt->data,pkt->length);
-						r_entry.dest_id=host_info.my_ID;
+						r_entry.dest_id=host_info.my_ID;   
 						r_entry.dest_mac=host_info.my_addr;
 						r_entry.next_id=pkt->src_id;
 						r_entry.next_mac=pkt->src_mac;
@@ -210,16 +239,63 @@ int main(void)
 						dump_table(&rtable);
 				    //send RREP back to hop by hop 
 				    send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
-				    // we sleep for 5 secoonds to wait KING to wakeup
-				    debug_print(" after sending RREP , go to sleep for 5 seconds\r\n");
-				   // pause(SLEEP_TIME);
 				
-
-					break;				
-			  default: //normal pacekt
-			     //do_packet
-				    //......not yet ....
+				   //in fact , you will get RREP, meaning that the KING is alive, so send data(type=NORMAL) to KING
+				    send_to_KING(&rtable);	
+			    	
+				
+	        break;			
+  
+				case NORMAL:			
+				
+						//debug_print("Get NORMAL data\r\n");
+					 					 
+						if (pkt->data[0]==host.my_ID) { 
+							  
+						   	Host *h;
+							  uint8_t data[10];
+							  //debug_print("I Got you: ");
+							  h=(Host *)&pkt->data[1];
+							  if (ID_LIST[h->my_ID-'A']==0) {
+									ID_LIST[h->my_ID-'A']=1;
+							    sprintf((char *)output_array,"<<<Time=%d: ID=%c/%#x seq=%d>>>\r\n",timer_count,h->my_ID,h->my_addr,pkt->data[5]);
+				          debug_print(output_array);
+									statistic.num_dev++;
+									if (statistic.num_dev==NUM_CHILDREN) {
+									   statistic.end_time=timer_count;
+										 show_report();
+									}
+									
+								}
+								//debug_print("Send Data ACK\r\n");
+							 data[0]=pkt->data[1]; //src ID
+							 data[1]=pkt->data[5]; //seq no.
+							// pkt->data[1]--> //src ID, send ACK to him 
+							  send_DATA_ACK(host.my_ID-1,data,2,&rtable);
+						} else { //not owner , so just forward
+									debug_print("Forward\r\n");
+						      send_DATA(pkt->data[0],pkt->data,pkt->length,&rtable);
+							    
+				    }
 				  break;
+
+				case NORMAL_ACK:			
+					 					 
+						if (pkt->data[0]==host.my_ID) { 
+							sprintf((char *)output_array,"ACK from KING <---- %c,# %d\r\n",pkt->data[0],pkt->data[1]);
+						    debug_print(output_array);
+							  State=FINISH;
+						} else {
+									debug_print("Forward to the previous node\r\n");
+						      send_DATA_ACK(host.my_ID-1,pkt->data,pkt->length,&rtable);
+				    }
+				  break;
+
+						
+					
+					default:
+						//unknown type
+					  break;
 						
 			 } //end switch
 	   }  //if rx available
@@ -227,10 +303,20 @@ int main(void)
 		if (timer_count==10 && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
 		    host.my_ID='A';			
 		    timer_count=0;
-		  	debug_print("I'm the first one , set myID to 'A'\r\n");	 
-			  blink_led(1); 
+		    blink_led(1); 
 			  show_myinfo();
 		}
+		
+		if (State==WAIT_ACK) {
+			 Delay((uint8_t)host.my_ID*10);  //Maybe good , if we use different delay time
+       send_to_KING(&rtable);	
+			 
+		}
+		
+		
+		
+		
+		
 		
 	}  //edn while(1)
 
@@ -239,6 +325,9 @@ int main(void)
 		
 
 } //end main
+
+
+
 
 //---------------------------------------------
 //Packet Handling
@@ -249,6 +338,8 @@ void init()
 	
   host.my_addr=MY_DEVICE_ADDR;
 	host.my_ID='@'; //init to '@':0x40  
+	memset(&statistic,0,sizeof(Statistic));
+	State=INIT;
 	
 }
 
@@ -262,24 +353,17 @@ void debug_print(char *s)
 
 }
 
-//King ID will show report
-void show_report(uint16_t id)
+
+void show_report(void)
 {
-  uint8_t i;
-	char output_array[PRINT_BUFSIZE]={0}; 	
-		sprintf((char *)output_array,"ID COUNT SEQ T1	T2\r\n");
-		debug_print(output_array);
-		
-	
-	for(i=0;i<10;i++){
-	
-	//sprintf((char *)output_array,"%2d %4d %4d %4d %4d\r\n",
-	//	 rtable[id].dev_id,rtable[id].packet_count,rtable[id].last_seq_no,rtable[id].t1,rtable[id].t2);
-	//debug_print(output_array);
-	}
-
+ 
+	sprintf((char *)output_array,"----Statistics --------------\r\n");
+	debug_print(output_array);
+	sprintf((char *)output_array,"Start Time\tEnd Time\tPackets\r\n");
+	debug_print(output_array);
+	sprintf((char *)output_array,"%d\t\t%d\t\t%d\r\n",statistic.start_time, statistic.end_time,statistic.packet_count);
+	debug_print(output_array);
 }
-
 
 void req_whoami()
 {  	
@@ -336,7 +420,43 @@ void send_message( uint16_t type,uint16_t dest_id,uint16_t dest_mac, uint8_t *da
 
 void send_FLAG()
 {
-  send_message(FLAG,'0',0xFFFF,NULL,0);
+  send_message(FLAG,0,0xFFFF,(uint8_t *)"FLAG",4);
+
+}
+void send_to_KING(Route_Table *tbl)
+{  
+	  static uint8_t seq=1;
+		uint8_t data[10];
+		data[0]=KING_ID;
+		memcpy(&data[1],&host,sizeof(Host));
+		sprintf((char *)output_array,"send DATA to king ---->(# %d)\r\n",seq);
+		debug_print(output_array);
+	  data[5]=seq++;
+	  State=WAIT_ACK;
+		send_DATA(KING_ID,data,sizeof(Host)+2,tbl);
+	 
+}
+
+
+void send_DATA(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl)
+{
+
+	 Route *r;
+	
+  r=find_next_hop(id,tbl);   
+ 	if (r)
+	   send_message(NORMAL,id,r->next_mac ,data,size);
+
+}
+
+void send_DATA_ACK(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl)
+{
+
+	 Route *r;
+	
+  r=find_next_hop(id,tbl);   
+ 	if (r)
+	   send_message(NORMAL_ACK,id,r->next_mac ,data,size);
 
 }
 
@@ -344,8 +464,7 @@ void send_FLAG()
 	
 void send_RREP(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl)
 {
-	//query a MAC addr with its ID  
-	// uint16_t  q_addr;
+
 	 Route *r;
 	
   r=find_next_hop(id,tbl);   
@@ -360,7 +479,7 @@ void dump_packet(Packet *p)
 	 uint8_t i;
   
 	if (debug) {
-		sprintf((char *)output_array,"Receiving: %#x\t%c\t%#x\t%c\t%#x \t%d\r\n",p->type,p->dest_id,p->dest_mac,p->src_id,p->src_mac,p->length);
+		sprintf((char *)output_array,"Receiving: %#x\t%c\t%#x\t%c\t%#x \t%d\r\n==>",p->type,p->dest_id,p->dest_mac,p->src_id,p->src_mac,p->length);
 	   	debug_print(output_array);
 	     for (i=0;i<p->length;i++) {
 	       	sprintf((char *)output_array,"%#x ",p->data[i]);
@@ -397,15 +516,6 @@ void update_table(Packet *pkt,Route_Table *tbl)
 //------------------------------
 //Utility function
 //--------------------------------
-void pause(uint16_t period)
-{
-		//sleep for SLEEP_TIME units
-	  
-		 setTimer(2,period, UNIT_MS);
-     while (!checkTimer(2))
-			        ;
-			  
-}
 
 //blinking LED
 void blink_led(int count)
@@ -413,9 +523,9 @@ void blink_led(int count)
 	uint8_t i;
 	for (i=0;i<count;i++) {		
 	    setGPIO(2,1);
-		  pause(BLINK_PERIOD);
+		  Delay(BLINK_PERIOD);
 	  	setGPIO(2,0);
-		  pause(BLINK_PERIOD);
+		  Delay(BLINK_PERIOD);
 		
   }		
 }
@@ -487,7 +597,7 @@ void dump_table(Route_Table *tbl)
 	
    for (i=0;i<tbl->index;i++)
    {
-		 	sprintf((char *)output_array,"%c\t0x%x\t%c\t0x%x\r\n",tbl->table[i].dest_id,tbl->table[i].dest_mac,tbl->table[i].next_id,tbl->table[i].next_mac);
+		 	sprintf((char *)output_array,"%c\t0x%x\t\t%c\t\t0x%x\r\n",tbl->table[i].dest_id,tbl->table[i].dest_mac,tbl->table[i].next_id,tbl->table[i].next_mac);
 	   	debug_print(output_array);
      
   
