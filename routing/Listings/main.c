@@ -1,6 +1,7 @@
 //-----------------------
 // Wireless Communication Homework
-// Author List: joseph(D05921016@ntu.edu.tw), ,  
+// Author List: joseph(D05921016@ntu.edu.tw), Wei-Che Chen (r05942110@ntu.edu.tw),Chin yen su (james821007@gmail.com) 
+
 // Date: Nov 28,2016
 //---------------------
 // Note: 
@@ -14,10 +15,11 @@
 #include "autonet.h"
 
 //--------------------
-#define MY_DEVICE_ADDR  0x0002  //!!!!! SHOULD set different mac addr  !!!!!!!!
-#define NUM_CHILDREN  2        //!!!! SHOULD set correctly !!!!!
+#define MY_DEVICE_ADDR  0x0008
+//!!!!! SHOULD set different mac addr  !!!!!!!!
+#define NUM_CHILDREN  5        //!!!! SHOULD set correctly !!!!!
 #define KING_ID 'A'+NUM_CHILDREN   //'A'~'H' ; note : Target ID is 'C' if the number of children is 2
-#define DEBUG 1
+#define DEBUG 0
 //------------------------------
 
 
@@ -211,7 +213,9 @@ int main(void)
 					  debug_print("broadcast 'FLAG' and go to sleep zzzzzzz\r\n");
 						send_FLAG();						
 					  // sleep for 5 seconds
+						setGPIO(2,1);
 						Delay(SLEEP_TIME);
+						setGPIO(2,0);
 						debug_print("I just waking up!! and send send_RREP\r\n");
 						statistic.start_time=timer_count;
 					  //send RREP back to notify others that I just waking up
@@ -285,6 +289,7 @@ int main(void)
 							sprintf((char *)output_array,"ACK from KING <---- %c,# %d\r\n",pkt->data[0],pkt->data[1]);
 						    debug_print(output_array);
 							  State=FINISH;
+							  setGPIO(2,1);
 						} else {
 									debug_print("Forward to the previous node\r\n");
 						      send_DATA_ACK(host.my_ID-1,pkt->data,pkt->length,&rtable);
