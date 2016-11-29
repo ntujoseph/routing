@@ -314,7 +314,7 @@ int main(void)
 			 } //end switch
 	   }  //if rx available
 		
-		if (timer_count==10 && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
+		if (timer_count==(1000/T) && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
 		    host.my_ID='A';			
 		    timer_count=0;
 		    blink_led(1); 
