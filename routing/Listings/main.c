@@ -1,8 +1,11 @@
 //-----------------------
 // Wireless Communication Homework
-// Author List: joseph(D05921016@ntu.edu.tw), Wei-Che Chen (r05942110@ntu.edu.tw),Chin yen su (james821007@gmail.com) 
-
-// Date: Nov 28,2016
+// Author List: 
+//joseph(D05921016@ntu.edu.tw), 
+//Wei-Che Chen (r05942110@ntu.edu.tw)
+//Chin yen su (james821007@gmail.com) 
+// Version: 1.0
+// Date: Nov 29,2016
 //---------------------
 // Note: 
 // LED Pin  on J3-03
@@ -40,6 +43,8 @@
 
 #define SLEEP_TIME 5000  //unit: ms
 #define BLINK_PERIOD 300  //unit: ms
+
+#define T 1 // unit : ms
 
 
 int debug=DEBUG;
@@ -156,7 +161,7 @@ int main(void)
 	 show_myinfo();
 
 
-  	setTimer(1, 100, UNIT_MS);  //100ms
+  	setTimer(1, T, UNIT_MS);  // T ms
     //send WHOAMI packet in ordet to recognize the who i am (ID)
 		debug_print("send WHOAMI packet .....\r\n");	 
 		
@@ -241,12 +246,15 @@ int main(void)
 						r_entry.next_mac=pkt->src_mac;
 				  	add_route(&r_entry,&rtable);						
 						dump_table(&rtable);
+				    
+				   	 //in fact , you will get RREP, meaning that the KING is alive, so send data(type=NORMAL) to KING
+				    send_to_KING(&rtable);	
+			    	
+				   
 				    //send RREP back to hop by hop 
 				    send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
 				
-				   //in fact , you will get RREP, meaning that the KING is alive, so send data(type=NORMAL) to KING
-				    send_to_KING(&rtable);	
-			    	
+			
 				
 	        break;			
   
@@ -313,7 +321,7 @@ int main(void)
 		}
 		
 		if (State==WAIT_ACK) {
-			 Delay((uint8_t)host.my_ID*10);  //Maybe good , if we use different delay time
+			 Delay((uint8_t)host.my_ID*T);  //Maybe good , if we use different delay time
        send_to_KING(&rtable);	
 			 
 		}
