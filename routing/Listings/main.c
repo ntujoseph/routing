@@ -314,7 +314,7 @@ int main(void)
 			 } //end switch
 	   }  //if rx available
 		
-		if (timer_count==(2000/T) && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
+		if (timer_count==(1000/T) && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
 		    host.my_ID='A';			
 		    timer_count=0;
 		    blink_led(1); 
@@ -322,7 +322,7 @@ int main(void)
 		}
 		
 		if (State==WAIT_ACK) {
-			 Delay((uint8_t)host.my_ID/10);  //Maybe good , if we use different delay time
+			 //Delay((uint8_t)host.my_ID/10);  //Maybe good , if we use different delay time
        send_to_KING(&rtable);	
 			 
 		}
