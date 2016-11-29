@@ -321,7 +321,7 @@ int main(void)
 		}
 		
 		if (State==WAIT_ACK) {
-			 Delay((uint8_t)host.my_ID*T);  //Maybe good , if we use different delay time
+			 Delay((uint8_t)host.my_ID/10);  //Maybe good , if we use different delay time
        send_to_KING(&rtable);	
 			 
 		}
