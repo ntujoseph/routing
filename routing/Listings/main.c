@@ -194,6 +194,7 @@ int main(void)
 			switch (pkt->type) {
 			
 				case WHOAMI_REQ:
+					Delay((uint8_t)host.my_ID); 
 					reply_whoami(pkt->src_id,pkt->src_mac);
 				
 		
