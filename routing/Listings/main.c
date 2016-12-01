@@ -33,19 +33,18 @@
 #define RCV_BUFSIZE 128
 #define MAX 20  //routing table size
 //define Packet type
-#define WHOAMI_REQ 	0x8000
-#define WHOAMI_REP 	0x8001
-#define RREP 			  0x4000
-#define FLAG   			0x2000
-#define NORMAL   		0x1000
-#define NORMAL_ACK  0x1001
+#define WHOAMI_REQ 	0x80
+#define WHOAMI_REP 	0x81
+#define RREP 			  0x40
+#define FLAG   			0x20
+#define NORMAL   		0x10
+#define NORMAL_ACK  0x11
 
 
 #define SLEEP_TIME 5000  //unit: ms
 #define BLINK_PERIOD 300  //unit: ms
 
 #define T 1 // unit : ms
-
 
 int debug=DEBUG;
 
@@ -58,13 +57,13 @@ typedef struct _host
 
 typedef struct _packet
 {
-  uint16_t type;
+  uint8_t type;
   uint16_t dest_id;
   uint16_t dest_mac;
 	uint16_t src_id;
   uint16_t src_mac;
 	uint8_t length; // data length
-	uint8_t data[10];
+	uint8_t data[6];
 }Packet;
 
 	  
@@ -113,7 +112,7 @@ void show_report(void);
 void dump_packet(Packet *p);
 void req_whoami(void);
 void reply_whoami(uint16_t dest_id,uint16_t macaddr);
-void send_message( uint16_t type,uint16_t dest_id,uint16_t dest_mac, uint8_t *data, uint8_t size);
+void send_message( uint8_t type,uint16_t dest_id,uint16_t dest_mac, uint8_t *data, uint8_t size);
 void send_RREP(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl);
 void send_DATA(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl);
 void send_DATA_ACK(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl);
@@ -157,7 +156,7 @@ int main(void)
   prev_ID=host.my_ID;
   init_table(&rtable);
 	
-   debug_print("Starging .....\r\n");
+   debug_print("Starting .....\r\n");
 	 show_myinfo();
 
 
@@ -194,7 +193,7 @@ int main(void)
 			switch (pkt->type) {
 			
 				case WHOAMI_REQ:
-					Delay((uint8_t)(host.my_ID-'@')*100); 
+					Delay((uint8_t)('H'-host.my_ID)*10); 
 					reply_whoami(pkt->src_id,pkt->src_mac);
 				
 		
@@ -223,10 +222,10 @@ int main(void)
 						Delay(SLEEP_TIME);
 						setGPIO(2,0);
 						debug_print("I just waking up!! and send send_RREP\r\n");
-						statistic.start_time=timer_count;
-					  //send RREP back to notify others that I just waking up
+						//send RREP back to notify others that I just waking up
 						memcpy(data,&host,sizeof(Host));
-		        send_RREP(host.my_ID-1,data,sizeof(Host),&rtable);						
+		        send_RREP(host.my_ID-1,data,sizeof(Host),&rtable);	
+						statistic.start_time=timer_count;				
 			      statistic.enable=1;
 					  flag=1;
 						
@@ -314,7 +313,7 @@ int main(void)
 			 } //end switch
 	   }  //if rx available
 		
-		if (timer_count==(1000/T) && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
+		if (timer_count==(3000/T) && host.my_ID=='@') {  // wait for 1 second and nobody reply ,myID is 'A' (first one)
 		    host.my_ID='A';			
 		    timer_count=0;
 		    blink_led(1); 
@@ -412,7 +411,7 @@ void reply_whoami(uint16_t dest_id,uint16_t macaddr)
 
 
 
-void send_message( uint16_t type,uint16_t dest_id,uint16_t dest_mac, uint8_t *data, uint8_t size)
+void send_message( uint8_t type,uint16_t dest_id,uint16_t dest_mac, uint8_t *data, uint8_t size)
 {
  
 	 Packet packet;
