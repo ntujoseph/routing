@@ -221,10 +221,13 @@ int main(void)
 						setGPIO(2,1);
 						Delay(SLEEP_TIME);
 						setGPIO(2,0);
-						debug_print("I just waking up!! and send send_RREP\r\n");
 						//send RREP back to notify others that I just waking up
 						memcpy(data,&host,sizeof(Host));
-		        send_RREP(host.my_ID-1,data,sizeof(Host),&rtable);	
+		        send_RREP(host.my_ID-1,data,sizeof(Host),&rtable);	//H-->G-->E-->C-->A
+						/*20161206: joseph modified , add the follwing for two hops 
+						 but it is possible to cause collision when replying RREP
+						*/
+						send_RREP(host.my_ID-2,data,sizeof(Host),&rtable);	//H-->F-->D-->B
 						statistic.start_time=timer_count;				
 			      statistic.enable=1;
 					  flag=1;
@@ -245,14 +248,16 @@ int main(void)
 						r_entry.next_id=pkt->src_id;
 						r_entry.next_mac=pkt->src_mac;
 				  	add_route(&r_entry,&rtable);						
-						dump_table(&rtable);
+						//dump_table(&rtable);
 				    
 				   	 //in fact , you will get RREP, meaning that the KING is alive, so send data(type=NORMAL) to KING
 				    send_to_KING(&rtable);	
 			    	
 				   
 				    //send RREP back to hop by hop 
-				    send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
+				    //send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
+				   //20161206: jospeh modified , send RREP back by two hops 
+				    send_RREP(host.my_ID-2,pkt->data,pkt->length,&rtable);
 				
 			
 				
@@ -294,12 +299,12 @@ int main(void)
 				case NORMAL_ACK:			
 					 					 
 						if (pkt->data[0]==host.my_ID) { 
-							sprintf((char *)output_array,"ACK from KING <---- %c,# %d\r\n",pkt->data[0],pkt->data[1]);
-						    debug_print(output_array);
+							//sprintf((char *)output_array,"ACK from KING <---- %c,# %d\r\n",pkt->data[0],pkt->data[1]);
+						 //   debug_print(output_array);
 							  State=FINISH;
 							  setGPIO(2,1);
 						} else {
-									debug_print("Forward to the previous node\r\n");
+								//	debug_print("Forward to the previous node\r\n");
 						      send_DATA_ACK(host.my_ID-1,pkt->data,pkt->length,&rtable);
 				    }
 				  break;
@@ -362,6 +367,7 @@ void debug_print(char *s)
 {
 	  int len=strlen(s);
 	  COM2_Tx((uint8_t *)s,len);
+	
 
 
 }
@@ -442,8 +448,8 @@ void send_to_KING(Route_Table *tbl)
 		uint8_t data[10];
 		data[0]=KING_ID;
 		memcpy(&data[1],&host,sizeof(Host));
-		sprintf((char *)output_array,"send DATA to king ---->(# %d)\r\n",seq);
-		debug_print(output_array);
+	//	sprintf((char *)output_array,"send DATA to king ---->(# %d)\r\n",seq);
+	//	debug_print(output_array);
 	  data[5]=seq++;
 	  State=WAIT_ACK;
 		send_DATA(KING_ID,data,sizeof(Host)+2,tbl);
@@ -479,8 +485,9 @@ void send_RREP(uint16_t id, uint8_t *data, uint8_t size,Route_Table *tbl)
 {
 
 	 Route *r;
-	
-  r=find_next_hop(id,tbl);   
+
+  r=find_next_hop(id,tbl);
+
  	if (r)
 	   send_message(RREP,id,r->next_mac ,data,size);
 
@@ -523,7 +530,7 @@ void update_table(Packet *pkt,Route_Table *tbl)
 		r_entry.next_id=pkt->src_id;
 		r_entry.next_mac=pkt->src_mac;
 		add_route(&r_entry,tbl);						
-	  dump_table(tbl);
+	  //dump_table(tbl);
 
 }
 //------------------------------
