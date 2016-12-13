@@ -20,7 +20,7 @@
 //--------------------
 #define MY_DEVICE_ADDR  0x0008
 //!!!!! SHOULD set different mac addr  !!!!!!!!
-#define NUM_CHILDREN  5        //!!!! SHOULD set correctly !!!!!
+#define NUM_CHILDREN  7        //!!!! SHOULD set correctly !!!!!
 #define KING_ID 'A'+NUM_CHILDREN   //'A'~'H' ; note : Target ID is 'C' if the number of children is 2
 #define DEBUG 0
 //------------------------------
@@ -60,10 +60,10 @@ typedef struct _packet
   uint8_t type;
   uint16_t dest_id;
   uint16_t dest_mac;
-	uint16_t src_id;
+  uint16_t src_id;
   uint16_t src_mac;
-	uint8_t length; // data length
-	uint8_t data[6];
+  uint8_t length; // data length
+  uint8_t data[6];
 }Packet;
 
 	  
@@ -226,8 +226,9 @@ int main(void)
 		        send_RREP(host.my_ID-1,data,sizeof(Host),&rtable);	//H-->G-->E-->C-->A
 						/*20161206: joseph modified , add the follwing for two hops 
 						 but it is possible to cause collision when replying RREP
-						*/
+				
 						send_RREP(host.my_ID-2,data,sizeof(Host),&rtable);	//H-->F-->D-->B
+								*/
 						statistic.start_time=timer_count;				
 			      statistic.enable=1;
 					  flag=1;
@@ -255,9 +256,9 @@ int main(void)
 			    	
 				   
 				    //send RREP back to hop by hop 
-				    //send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
+				    send_RREP(host.my_ID-1,pkt->data,pkt->length,&rtable);
 				   //20161206: jospeh modified , send RREP back by two hops 
-				    send_RREP(host.my_ID-2,pkt->data,pkt->length,&rtable);
+				   // send_RREP(host.my_ID-2,pkt->data,pkt->length,&rtable);
 				
 			
 				
